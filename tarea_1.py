@@ -16,9 +16,14 @@ import entornos_o
 # Usa el modulo doscuartos_f.py para reutilizar código
 # Agrega los modulos que requieras de python
 
-##############
+
+
+######################################################################################
+
+
 
 # 1) Nueve Cuartos
+
 
 from random import choice
 
@@ -115,9 +120,13 @@ class NueveCuartos(entornos_o.Entorno):
         return robot, piso, situacion
 
 
-###############
 
-# 2)
+######################################################################################
+
+
+
+# 2) Agentes reactivos y agente aleatorio
+
 
 class AgenteReactivoNuevecuartos(entornos_o.Agente):
     """
@@ -164,18 +173,16 @@ class AgenteReactivoModeloNueveCuartos(entornos_o.Agente):
         self.modelo[1] = piso
         self.modelo[self.indice_cuarto(piso, robot)] = situacion
 
-        if "sucio" not in self.modelo[2:]:
-            return "nada"
-
         # Decide sobre el modelo interno
-        if situacion == 'sucio':
-            return 'limpiar'
-        if robot == 'A' and piso > 1:
-            return 'bajar'
-        if robot == 'C' and piso < 3:
-            return 'subir'
-        return 'ir_Derecha'
-    
+        return (
+            'nada' if 'sucio' not in self.modelo[2:] else
+            'limpiar' if situacion == 'sucio' else
+            'ir_Izquierda' if robot != 'A' and 'sucio' in self.modelo[self.indice_cuarto(piso, 'A'):
+                                                                      self.indice_cuarto(piso, robot)] else
+            'ir_Derecha' if robot != 'C' else
+            'subir' if piso < 3 else 
+            'nada'
+            )
     
 class AgenteAleatorio(entornos_o.Agente):
     """
@@ -189,9 +196,13 @@ class AgenteAleatorio(entornos_o.Agente):
         return choice(self.acciones)
 
 
-###############
+
+######################################################################################
+
+
 
 # 3)
+
 
 class NueveCuartosCiego(NueveCuartos):
     """
@@ -199,47 +210,85 @@ class NueveCuartosCiego(NueveCuartos):
 
     """
     def percepcion(self):
-        return []
+        robot = self.x[0]
+        piso = self.x[1]
+
+        return robot, piso, '?'
 
 
 class AgenteReactivoModeloNueveCuartosCiego(entornos_o.Agente):
     """
-    Un agente reactivo basado en modelo
-
+    Agente reactivo basado en modelo (ciego)
     """
+
     def __init__(self):
-        """
-        Inicializa el modelo interno en el peor de los casos
+        self.modelo = ['A', 1,
+                       'sucio', 'sucio', 'sucio',
+                       'sucio', 'sucio', 'sucio',
+                       'sucio', 'sucio', 'sucio']
 
-        """
-        self.modelo = ['?', 'sucio', 'sucio']
+    def indice_cuarto(self, piso, cuarto):
+        return 2 + (piso - 1) * 3 + "ABC".find(cuarto)
 
-    def programa(self, _):
-        
+    def programa(self, percepcion):
+        robot, piso, _ = percepcion
+
         # Decide sobre el modelo interno
-        robot, a, b = self.modelo
-        accion = ('ir_A' if robot == '?' else
-                  'nada' if a == b == 'limpio' else
-                  'limpiar' if self.modelo[' AB'.find(robot)] == 'sucio' else
-                  'ir_A' if robot == 'B' else 'ir_B' 
-                  
-                  )
+        accion = (
+            'nada'
+            if 'sucio' not in self.modelo[2:] else
+            'ir_Derecha'
+            if robot == '?' else
+            'limpiar'
+            if self.modelo[self.indice_cuarto(piso, robot)] == 'sucio' else
+            'subir'
+            if robot == 'C' and piso < 3 else
+            'bajar'
+            if robot == 'A' and piso > 1 else
+            'ir_Derecha'
+            if robot != 'C' else
+            'ir_Izquierda'
+        )
 
         # Actualiza el modelo interno
-        if accion == 'ir_A':
+        if robot == '?':
             self.modelo[0] = 'A'
-        elif accion == 'ir_B':
-            self.modelo[0] = 'B'
+            self.modelo[1] = 1
+
+        elif accion == 'ir_Derecha':
+            self.modelo[0] = "ABC"["ABC".find(robot) + 1]
+
+        elif accion == 'ir_Izquierda':
+            self.modelo[0] = "ABC"["ABC".find(robot) - 1]
+
+        elif accion == 'subir':
+            self.modelo[1] += 1
+
+        elif accion == 'bajar':
+            self.modelo[1] -= 1
+
         elif accion == 'limpiar':
-            self.modelo[' AB'.find(robot)] = 'limpio'
-            
+            i = self.indice_cuarto(piso, robot)
+            self.modelo[i] = 'limpio'
+
         return accion
 
-###############
+
+
+
+
+######################################################################################
+
+
 
 # 4)
 
-###############
+
+
+
+######################################################################################
+
+
 
 # Pruebas:
 
@@ -269,10 +318,10 @@ def test():
                          AgenteReactivoModeloNueveCuartos(), 
                          200)
 
-    #print("Prueba del entorno ciego con un agente reactivo con modelo")
-    #entornos_o.simulador(NueveCuartosCiego(x0), 
-    #                     AgenteReactivoModeloNueveCuartosCiego(), 
-    #                     100)
+    print("Prueba del entorno ciego con un agente reactivo con modelo")
+    entornos_o.simulador(NueveCuartosCiego(x0), 
+                         AgenteReactivoModeloNueveCuartosCiego(), 
+                         200)
 
 
 if __name__ == "__main__":
