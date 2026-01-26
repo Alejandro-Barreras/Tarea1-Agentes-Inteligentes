@@ -184,16 +184,20 @@ class AgenteReactivoModeloNueveCuartos(entornos_o.Agente):
             'nada'
             )
     
-class AgenteAleatorio(entornos_o.Agente):
     """
-    Un agente que solo regresa una accion al azar entre las acciones legales
+
+    Obervaciones al comparar con agente aleatorio:
+
+    - El agente aleatorio tarda más en limpiar todos los cuartos, además de que
+      gasta más recursos (costo mayor). Y no garantiza que limpie todos los cuartos
+      en un número fijo de pasos.
+
+    - El agente reactivo basado en modelo garantiza que limpiará todos los cuartos en
+      una cantidad pasos determinados, ya que cuando llega a un cuarto checa si está 
+      sucio y lo limpia, y si está limpio se mueve al siguiente cuarto sistemáticamente. 
+      Así que su costo es menor.
 
     """
-    def __init__(self, acciones):
-        self.acciones = acciones
-
-    def programa(self, _):
-        return choice(self.acciones)
 
 
 
@@ -218,63 +222,142 @@ class NueveCuartosCiego(NueveCuartos):
 
 class AgenteReactivoModeloNueveCuartosCiego(entornos_o.Agente):
     """
-    Agente reactivo basado en modelo (ciego)
+    Agente reactivo basado en modelo.
+
     """
-
+    
     def __init__(self):
-        self.modelo = ['A', 1,
-                       'sucio', 'sucio', 'sucio',
-                       'sucio', 'sucio', 'sucio',
-                       'sucio', 'sucio', 'sucio']
-
+        self.modelo = ['?', '?',
+                       'no_visitado', 'no_visitado', 'no_visitado',
+                       'no_visitado', 'no_visitado', 'no_visitado',
+                       'no_visitado', 'no_visitado', 'no_visitado']
+    
     def indice_cuarto(self, piso, cuarto):
         return 2 + (piso - 1) * 3 + "ABC".find(cuarto)
-
+    
     def programa(self, percepcion):
         robot, piso, _ = percepcion
+        
+        self.modelo[0] = robot
+        self.modelo[1] = piso
+        
+        indice_actual = self.indice_cuarto(piso, robot)
 
-        # Decide sobre el modelo interno
-        accion = (
-            'nada'
-            if 'sucio' not in self.modelo[2:] else
-            'ir_Derecha'
-            if robot == '?' else
-            'limpiar'
-            if self.modelo[self.indice_cuarto(piso, robot)] == 'sucio' else
-            'subir'
-            if robot == 'C' and piso < 3 else
-            'bajar'
-            if robot == 'A' and piso > 1 else
-            'ir_Derecha'
-            if robot != 'C' else
-            'ir_Izquierda'
-        )
+        # Si ya se visitaron todos los cuartos, hacer nada
+        if 'no_visitado' not in self.modelo[2:]:
+            return 'nada'
+        # Si el cuarto actual no ha sido visitado, limpiarlo
+        if self.modelo[indice_actual] == 'no_visitado':
+            self.modelo[indice_actual] = 'visitado'
+            return 'limpiar'
+        
+        # Revisar cuartos actuales
+        a_actual = self.indice_cuarto(piso, 'A')
+        b_actual = self.indice_cuarto(piso, 'B')
+        c_actual = self.indice_cuarto(piso, 'C')
+        
+        if (self.modelo[a_actual] == 'no_visitado' or 
+            self.modelo[b_actual] == 'no_visitado' or 
+            self.modelo[c_actual] == 'no_visitado'):
+            
+            if robot == 'A':
+                return 'ir_Derecha'
+            elif robot == 'B':
+                if self.modelo[c_actual] == 'no_visitado':
+                    return 'ir_Derecha'
+                else:
+                    return 'ir_Izquierda'
+            else:  
+                return 'ir_Izquierda'
 
-        # Actualiza el modelo interno
-        if robot == '?':
-            self.modelo[0] = 'A'
-            self.modelo[1] = 1
+        # Revisar los pisos 2 y 3
+        if piso == 1:
+            a2 = self.indice_cuarto(2, 'A')
+            b2 = self.indice_cuarto(2, 'B')
+            c2 = self.indice_cuarto(2, 'C')
+            if (self.modelo[a2] == 'no_visitado' or 
+                self.modelo[b2] == 'no_visitado' or 
+                self.modelo[c2] == 'no_visitado'):
+                if robot != 'C':
+                    return 'ir_Derecha'
+                else:
+                    return 'subir'
 
-        elif accion == 'ir_Derecha':
-            self.modelo[0] = "ABC"["ABC".find(robot) + 1]
+            a3 = self.indice_cuarto(3, 'A')
+            b3 = self.indice_cuarto(3, 'B')
+            c3 = self.indice_cuarto(3, 'C')
+            if (self.modelo[a3] == 'no_visitado' or 
+                self.modelo[b3] == 'no_visitado' or 
+                self.modelo[c3] == 'no_visitado'):
+                if robot != 'C':
+                    return 'ir_Derecha'
+                else:
+                    return 'subir'
+        
+        # Revisar los pisos 1 y 3
+        elif piso == 2:
+            a3 = self.indice_cuarto(3, 'A')
+            b3 = self.indice_cuarto(3, 'B')
+            c3 = self.indice_cuarto(3, 'C')
+            if (self.modelo[a3] == 'no_visitado' or 
+                self.modelo[b3] == 'no_visitado' or 
+                self.modelo[c3] == 'no_visitado'):
+                if robot != 'C':
+                    return 'ir_Derecha'
+                else:
+                    return 'subir'
+            
+            a1 = self.indice_cuarto(1, 'A')
+            b1 = self.indice_cuarto(1, 'B')
+            c1 = self.indice_cuarto(1, 'C')
+            if (self.modelo[a1] == 'no_visitado' or 
+                self.modelo[b1] == 'no_visitado' or 
+                self.modelo[c1] == 'no_visitado'):
+                if robot != 'A':
+                    return 'ir_Izquierda'
+                else:
+                    return 'bajar'
+        
+        # Revisar los pisos 1 y 2
+        elif piso == 3:
+            a2 = self.indice_cuarto(2, 'A')
+            b2 = self.indice_cuarto(2, 'B')
+            c2 = self.indice_cuarto(2, 'C')
+            if (self.modelo[a2] == 'no_visitado' or 
+                self.modelo[b2] == 'no_visitado' or 
+                self.modelo[c2] == 'no_visitado'):
+                if robot != 'A':
+                    return 'ir_Izquierda'
+                else:
+                    return 'bajar'
+            
+            a1 = self.indice_cuarto(1, 'A')
+            b1 = self.indice_cuarto(1, 'B')
+            c1 = self.indice_cuarto(1, 'C')
+            if (self.modelo[a1] == 'no_visitado' or 
+                self.modelo[b1] == 'no_visitado' or 
+                self.modelo[c1] == 'no_visitado'):
+                if robot != 'A':
+                    return 'ir_Izquierda'
+                else:
+                    return 'bajar'
+        
+        return 'nada'
+    
+    """
 
-        elif accion == 'ir_Izquierda':
-            self.modelo[0] = "ABC"["ABC".find(robot) - 1]
+    Observaciones al comparar con agente aleatorio:
 
-        elif accion == 'subir':
-            self.modelo[1] += 1
+    - El agente aleatorio tarda más en limpiar todos los cuartos, además de que
+      gasta más recursos (costo mayor). Y no garantiza que limpie todos los cuartos
+      en un número fijo de pasos.
 
-        elif accion == 'bajar':
-            self.modelo[1] -= 1
+    - El agente racional ciego garantiza que limpiará todos los cuartos en un tiempo
+      determinado ya que cada cuarto que visita lo limpia, y mantiene un registro 
+      de los cuartos visitados para no regresar a ellos innecesariamente. Así que es
+      más eficiente que el agente aleatorio.
 
-        elif accion == 'limpiar':
-            i = self.indice_cuarto(piso, robot)
-            self.modelo[i] = 'limpio'
-
-        return accion
-
-
-
+    """
 
 
 ######################################################################################
@@ -283,14 +366,70 @@ class AgenteReactivoModeloNueveCuartosCiego(entornos_o.Agente):
 
 # 4)
 
+class NueveCuartosEstocástico(NueveCuartos):
+    """
+    Igual que NueveCuartos, pero... 
+    - limpiar funciona el 80% de las veces y el 20% falla y deja sucio el cuarto.
+    - Las acciones de movimiento funcionan el 80% de las veces, el 10% no hacen 
+      nada y el otro 10% hacen una acción al azar.
 
+    """
+    def transicion(self, accion):
+        from random import random
+        from random import choice
 
+        rand = random()
+
+        if accion == "limpiar":
+            if rand < 0.8:
+                super().transicion(accion)
+                return
+            else:
+                self.costo += 1
+                return
+        elif accion in ("ir_Izquierda", "ir_Derecha", "subir", "bajar", "nada"):
+            if rand < 0.8:
+                NueveCuartos.transicion(self, accion)
+            elif rand < 0.9:
+                self.costo += 1
+            else:
+                acciones_legales = [a for a in ("ir_Izquierda", "ir_Derecha", "subir", "bajar", "limpiar", "nada")
+                                    if self.accion_legal(a) and a != accion]
+                accion_azar = choice(acciones_legales)
+                NueveCuartos.transicion(self, accion_azar)
+        else:
+            NueveCuartos.transicion(self, accion)
+    
+    """
+
+    Observaciones al comparar con agente aleatorio:
+
+    - El agente aleatorio tarda más en limpiar todos los cuartos, además de que
+      gasta más recursos (costo mayor). Y no garantiza que limpie todos los cuartos
+      en un número fijo de pasos.
+
+    - El agente estocástico revisa y limpia cada cuarto sistemáticamente, aunque 
+      algunas veces falle al limpiar o al moverse, eventualmente limpiará todos 
+      los cuartos en un tiempo determinado. Así que su costo es menor que el agente 
+      aleatorio.
+
+    """
+        
 
 ######################################################################################
 
-
-
 # Pruebas:
+
+class AgenteAleatorio(entornos_o.Agente):
+    """
+    Un agente que solo regresa una accion al azar entre las acciones legales
+
+    """
+    def __init__(self, acciones):
+        self.acciones = acciones
+
+    def programa(self, _):
+        return choice(self.acciones)
 
 def test():
     """
@@ -322,7 +461,11 @@ def test():
     entornos_o.simulador(NueveCuartosCiego(x0), 
                          AgenteReactivoModeloNueveCuartosCiego(), 
                          200)
-
+    
+    print("Prueba del entorno estocástico con un agente reactivo con modelo")
+    entornos_o.simulador(NueveCuartosEstocástico(x0), 
+                         AgenteReactivoModeloNueveCuartos(), 
+                         200)
 
 if __name__ == "__main__":
     test()
